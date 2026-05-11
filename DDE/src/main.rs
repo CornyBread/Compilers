@@ -2,11 +2,13 @@
 mod util;
 mod stack;
 mod queue;
+mod map;
 
 // Traemos las estructuras a este archivo para poder instanciarlas.
 use util::Printable;
 use stack::Stack;
 use queue::Queue;
+use map::Map;
 
 fn main() {
     println!("--- Probando Pila ---");
@@ -36,4 +38,15 @@ fn main() {
     let dequeued_item = my_queue.dequeue();
     println!("Elemento desencolado: {:?}", dequeued_item);
     my_queue.print_structure();
+
+    println!("\n--- Probando Mapa ---");
+    let mut my_map = Map::new();
+
+    my_map.insert("uno", 1);
+    my_map.insert("dos", 2);
+    my_map.insert("tres", 3);
+    my_map.print_structure();
+
+    let value = my_map.get(&"dos");
+    println!("Valor encontrado para 'dos': {:?}", value);
 }
