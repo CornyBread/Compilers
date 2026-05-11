@@ -1,0 +1,1 @@
+C:\Users\David\Documents\Compilers\DDE\target\debug\dde.exe: C:\Users\David\Documents\Compilers\DDE\src\main.rs C:\Users\David\Documents\Compilers\DDE\src\map.rs C:\Users\David\Documents\Compilers\DDE\src\queue.rs C:\Users\David\Documents\Compilers\DDE\src\stack.rs C:\Users\David\Documents\Compilers\DDE\src\util.rs

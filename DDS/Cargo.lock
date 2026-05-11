@@ -3,5 +3,5 @@
 version = 4
 
 [[package]]
-name = "dde"
+name = "dds"
 version = "0.1.0"
