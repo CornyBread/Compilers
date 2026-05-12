@@ -1,9 +1,6 @@
 use crate::util::Printable;
 use std::collections::VecDeque;
 
-// Estructura principal de la Cola (Queue - FIFO: Primero en entrar, primero en salir).
-// En lugar de punteros complejos dobles, usamos VecDeque de la librería 
-// estándar que ya maneja arreglos dinámicos circulares de forma muy eficiente.
 pub struct Queue<T> {
     elements: VecDeque<T>,
 }
@@ -27,11 +24,9 @@ impl<T> Queue<T> {
     }
 }
 
-// Implementamos el Trait Printable para la Queue.
 impl<T: std::fmt::Display> Printable for Queue<T> {
     fn print_structure(&self) {
         print!("Cola (Frente -> Final): ");
-        // Iteramos sobre los elementos internos de la estructura estándar.
         for element in &self.elements {
             print!("[{}] ", element);
         }

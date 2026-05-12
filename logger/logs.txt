@@ -1,0 +1,4 @@
+[1778626239][demo][INFO] Logger iniciado
+[1778626239][demo][DEBUG] Preparando datos para depuracion
+[1778626239][demo][WARN] Esto es un aviso de ejemplo
+[1778626239][demo][ERROR] Esto es un error de ejemplo
