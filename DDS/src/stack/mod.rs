@@ -1,2 +1,2 @@
 pub mod stack;
-use stack::Stack;
+pub use stack::Stack;
