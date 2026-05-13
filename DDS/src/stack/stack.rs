@@ -1,5 +1,3 @@
-// src/stack.rs
-
 use crate::util::Printable;
 
 // Usamos un Enum para representar los enlaces de la lista dinámica.
