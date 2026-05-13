@@ -3,14 +3,15 @@ mod util;
 mod stack;
 mod queue;
 mod map;
-mod reader;
+mod tree;
 
 // Traemos las estructuras a este archivo para poder instanciarlas.
 use util::Printable;
 use stack::Stack;
 use queue::Queue;
 use map::Map;
-use reader::FileReader;
+use tree::Tree;
+
 
 fn main() {
     println!("--- Probando Pila ---");
@@ -52,18 +53,30 @@ fn main() {
     let value = my_map.get(&"dos");
     println!("Valor encontrado para 'dos': {:?}", value);
 
-    println!("\n--- Probando File Reader ---");
-    
-    let ruta = "filereader_prueba.txt";
-    let resultado_lectura = FileReader::read_source_code(ruta);
+    println!("\n--- Probando Arbol ---");
+    // Instanciamos el árbol indicando que será de tipo i32
+    let mut num_tree: Tree<i32> = Tree::new();
 
-    match resultado_lectura {
-        Ok(contenido) => {
-            println!("¡Archivo leído con éxito! Contenido:");
-            println!("{}", contenido);
-        }
-        Err(e) => {
-            println!("No se pudo leer el archivo. Error: {}", e);
-        }
-    }
+    // 1. Definimos la raíz
+    num_tree.set_root(100);
+
+    // 2. Insertamos hijos bajo la raíz (100)
+    num_tree.insert_under(&100, 50);
+    num_tree.insert_under(&100, 150);
+    num_tree.insert_under(&100, 200);
+
+    // 3. Insertamos nietos (bajo el 50)
+    num_tree.insert_under(&50, 10);
+    num_tree.insert_under(&50, 20);
+    num_tree.insert_under(&50, 30);
+
+    // 4. Insertamos bajo el 150
+    num_tree.insert_under(&150, 125);
+
+    // 5. Insertamos bajo el 200 (un nivel más profundo)
+    num_tree.insert_under(&200, 300);
+    num_tree.insert_under(&300, 400);
+
+    // Imprimimos la estructura
+    num_tree.print_structure();
 }
