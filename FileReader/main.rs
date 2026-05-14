@@ -1,19 +1,22 @@
 mod file_reader; 
-use file_reader::FileReader; 
+use file_reader::FileReader;
 
 fn main() {
-    println!("\n--- Probando File Reader ---");
-        
     let ruta = "filereader_prueba.txt";
-    let resultado_lectura = FileReader::read_source_code(ruta);
 
-    match resultado_lectura {
-        Ok(contenido) => {
-            println!("¡Archivo leído con éxito! Contenido:");
-            println!("{}", contenido);
+    println!("--- PRUEBA 1: Leyendo todo---");
+    match FileReader::read_all(ruta) {
+        Ok(contenido) => println!("{}", contenido),
+        Err(e) => println!("Error al leer todo: {}", e),
+    }
+
+    println!("\n--- PRUEBA 2: Leyendo solo 3 líneas ---");
+    match FileReader::read_n_lines(ruta, 3) {
+        Ok(lineas) => {
+            for (numero, texto) in lineas.iter().enumerate() {
+                println!("Línea {}: {}", numero + 1, texto);
+            }
         }
-        Err(e) => {
-            println!("No se pudo leer el archivo. Error: {}", e);
-        }
+        Err(e) => println!("Error al leer líneas: {}", e),
     }
 }
