@@ -54,29 +54,33 @@ fn main() {
     println!("Valor encontrado para 'dos': {:?}", value);
 
     println!("\n--- Probando Arbol ---");
-    // Instanciamos el árbol indicando que será de tipo i32
+    
     let mut num_tree: Tree<i32> = Tree::new();
-
-    // 1. Definimos la raíz
     num_tree.set_root(100);
 
-    // 2. Insertamos hijos bajo la raíz (100)
-    num_tree.insert_under(&100, 50);
-    num_tree.insert_under(&100, 150);
-    num_tree.insert_under(&100, 200);
+    if let Some(raiz) = num_tree.find_node_mut(&100) {
+        raiz.add_child(50);
+        raiz.add_child(150);
+        raiz.add_child(200);
+    }
 
-    // 3. Insertamos nietos (bajo el 50)
-    num_tree.insert_under(&50, 10);
-    num_tree.insert_under(&50, 20);
-    num_tree.insert_under(&50, 30);
+    if let Some(nodo_50) = num_tree.find_node_mut(&50) {
+        nodo_50.add_child(10);
+        nodo_50.add_child(20);
+        nodo_50.add_child(30);
+    }
 
-    // 4. Insertamos bajo el 150
-    num_tree.insert_under(&150, 125);
+    if let Some(nodo_150) = num_tree.find_node_mut(&150) {
+        nodo_150.add_child(125);
+    }
 
-    // 5. Insertamos bajo el 200 (un nivel más profundo)
-    num_tree.insert_under(&200, 300);
-    num_tree.insert_under(&300, 400);
+    if let Some(nodo_200) = num_tree.find_node_mut(&200) {
+        nodo_200.add_child(300);
+    }
+    if let Some(nodo_300) = num_tree.find_node_mut(&300) {
+        nodo_300.add_child(400);
+    }
 
-    // Imprimimos la estructura
+    // Imprimimos la estructura 
     num_tree.print_structure();
 }

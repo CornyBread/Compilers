@@ -12,6 +12,10 @@ impl<T> TreeNode<T> {
             children: Vec::new(),
         }
     }
+
+    pub fn add_child(&mut self, value: T) {
+        self.children.push(TreeNode::new(value));
+    }
 }
 
 pub struct Tree<T> {
@@ -23,35 +27,34 @@ impl<T: PartialEq + Clone> Tree<T> {
         Tree { root: None }
     }
 
-
     pub fn set_root(&mut self, value: T) {
         if self.root.is_none() {
             self.root = Some(TreeNode::new(value));
         }
     }
 
-
-    pub fn insert_under(&mut self, parent_value: &T, new_value: T) -> bool {
+    pub fn find_node_mut(&mut self, target: &T) -> Option<&mut TreeNode<T>> {
         if let Some(ref mut root_node) = self.root {
-            return Self::find_and_insert(root_node, parent_value, new_value);
+            return Self::find_in_node(root_node, target);
         }
-        false
+        None
     }
 
-    fn find_and_insert(current: &mut TreeNode<T>, target: &T, new_value: T) -> bool {
-    if current.value == *target {
-        current.children.push(TreeNode::new(new_value));
-        return true;
-    }
-    
-    for child in &mut current.children {
-        if Self::find_and_insert(child, target, new_value.clone()) { 
-            return true;
+    fn find_in_node<'a>(current: &'a mut TreeNode<T>, target: &T) -> Option<&'a mut TreeNode<T>> {
+        if current.value == *target {
+            return Some(current); 
         }
+        
+        
+        for child in &mut current.children {
+            if let Some(found) = Self::find_in_node(child, target) {
+                return Some(found); 
+            }
+        }
+        None 
     }
-    false
 }
-}
+
 impl<T: std::fmt::Display> Printable for Tree<T> {
     fn print_structure(&self) {
         println!("Estructura del Árbol:");
