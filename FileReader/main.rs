@@ -4,19 +4,18 @@ use file_reader::FileReader;
 fn main() {
     let ruta = "filereader_prueba.txt";
 
-    println!("--- PRUEBA 1: Leyendo todo---");
-    match FileReader::read_all(ruta) {
-        Ok(contenido) => println!("{}", contenido),
-        Err(e) => println!("Error al leer todo: {}", e),
-    }
+    let inicio = 1;
+    let fin = 11;
 
-    println!("\n--- PRUEBA 2: Leyendo solo 3 líneas ---");
-    match FileReader::read_n_lines(ruta, 3) {
+    println!("Leyendo desde la línea {} hasta la {}", inicio, fin);
+    
+    match FileReader::read_lines_between(ruta, inicio, fin) {
         Ok(lineas) => {
-            for (numero, texto) in lineas.iter().enumerate() {
-                println!("Línea {}: {}", numero + 1, texto);
+            for (indice, texto) in lineas.iter().enumerate() {
+                let numero_linea_real = inicio + indice;
+                println!("Línea {}: {}", numero_linea_real, texto);
             }
         }
-        Err(e) => println!("Error al leer líneas: {}", e),
+        Err(e) => println!("Error al leer el rango de líneas: {}", e),
     }
 }

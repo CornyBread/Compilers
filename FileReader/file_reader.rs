@@ -9,16 +9,21 @@ impl FileReader {
         fs::read_to_string(file_path)
     }
 
-    pub fn read_n_lines(file_path: &str, limit: usize) -> io::Result<Vec<String>> {
+    pub fn read_lines_between(file_path: &str, start: usize, end: usize) -> io::Result<Vec<String>> {
+        if start == 0 || start > end {
+            return Ok(Vec::new());
+        }
+
         let file = File::open(file_path)?;
         let reader = BufReader::new(file);
         let mut lines_result = Vec::new();
 
-        for line in reader.lines().take(limit) {
+        let cantidad_a_tomar = end - start + 1;
+
+        for line in reader.lines().skip(start - 1).take(cantidad_a_tomar) {
             lines_result.push(line?);
         }
 
         Ok(lines_result)
     }
-
 }
