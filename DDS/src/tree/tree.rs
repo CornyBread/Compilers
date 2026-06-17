@@ -16,13 +16,18 @@ impl<T> TreeNode<T> {
     pub fn add_child(&mut self, value: T) {
         self.children.push(TreeNode::new(value));
     }
+
+    #[allow(dead_code)]
+    pub fn add_child_node(&mut self, node: TreeNode<T>) {
+        self.children.push(node);
+    }
 }
 
 pub struct Tree<T> {
     root: Option<TreeNode<T>>,
 }
 
-impl<T: PartialEq + Clone> Tree<T> {
+impl<T> Tree<T> {
     pub fn new() -> Self {
         Tree { root: None }
     }
@@ -33,6 +38,25 @@ impl<T: PartialEq + Clone> Tree<T> {
         }
     }
 
+    #[allow(dead_code)]
+    pub fn set_root_node(&mut self, node: TreeNode<T>) {
+        if self.root.is_none() {
+            self.root = Some(node);
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn root(&self) -> Option<&TreeNode<T>> {
+        self.root.as_ref()
+    }
+
+    #[allow(dead_code)]
+    pub fn root_mut(&mut self) -> Option<&mut TreeNode<T>> {
+        self.root.as_mut()
+    }
+}
+
+impl<T: PartialEq> Tree<T> {
     pub fn find_node_mut(&mut self, target: &T) -> Option<&mut TreeNode<T>> {
         if let Some(ref mut root_node) = self.root {
             return Self::find_in_node(root_node, target);

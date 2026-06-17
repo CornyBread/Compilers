@@ -1,13 +1,22 @@
 # Rust / Cargo outputs
-DDE/target/
+DDS/target/
 
 # Manual build artifacts from the bin folder
-DDE/bin/*.exe
-DDE/bin/*.pdb
-DDE/bin/*.ilk
-DDE/bin/*.d
+DDS/bin/*.exe
+DDS/bin/*.pdb
+DDS/bin/*.ilk
+DDS/bin/*.d
+
+# Build artifacts de los helpers sueltos
+**/*.exe
+**/*.pdb
+**/*.ilk
 
 # OS/editor junk
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# Asistentes de IA (no versionar)
+CLAUDE.md
+.claude/

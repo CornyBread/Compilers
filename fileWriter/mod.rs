@@ -1,2 +1,2 @@
-pub mod writer;
-pub use writer::fileWriter;
+pub mod file_writer;
+pub use file_writer::FileWriter;
