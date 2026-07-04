@@ -330,6 +330,166 @@ impl Parser {
         asignacion
     }
 
+    // --- Despacho de sentencias ------------------------------------------
+
+    /// Analiza una sentencia según con qué token empiece.
+    fn parse_sentencia(&mut self) -> Nodo {
+        let token = self.actual().clone();
+        match token.tipo {
+            TokenType::PalabraReservada => match token.lexema.as_str() {
+                "if" => self.parse_condicional(),
+                "while" => self.parse_while(),
+                "for" => self.parse_for(),
+                "return" => self.parse_return(),
+                _ => {
+                    let marcador =
+                        self.error(format!("Sentencia no soportada: '{}'", token.lexema));
+                    if !self.es_fin() {
+                        self.avanzar();
+                    }
+                    marcador
+                }
+            },
+            TokenType::Identificador => self.parse_desde_identificador(),
+            _ => {
+                let marcador = self.error("Se esperaba una sentencia");
+                if !self.es_fin() {
+                    self.avanzar();
+                }
+                marcador
+            }
+        }
+    }
+
+    /// ¿El token actual puede iniciar una expresión? (útil para `return`).
+    fn inicia_expresion(&self) -> bool {
+        let token = self.actual();
+        match token.tipo {
+            TokenType::Literal(_) | TokenType::Identificador => true,
+            TokenType::PalabraReservada => matches!(token.lexema.as_str(), "None" | "not"),
+            TokenType::Simbolo => matches!(token.lexema.as_str(), "(" | "-" | "+"),
+            _ => false,
+        }
+    }
+
+    // --- Bloques por indentación -----------------------------------------
+    //
+    // Python delimita los bloques por indentación. El lexer guarda en cada
+    // token su `nivel` (sangría de la línea). Un bloque son las sentencias
+    // cuyo nivel es mayor que el del encabezado (`if`, `while`, `def`, ...).
+
+    fn parse_bloque(&mut self, nivel_padre: usize) -> Nodo {
+        let mut cuerpo = nodo("Cuerpo");
+
+        // El cuerpo debe estar más indentado que su encabezado.
+        if self.es_fin() || self.actual().nivel <= nivel_padre {
+            self.error("Se esperaba un bloque indentado");
+            return cuerpo;
+        }
+
+        let nivel_bloque = self.actual().nivel;
+        while !self.es_fin() && !self.hubo_error && self.actual().nivel >= nivel_bloque {
+            let sentencia = self.parse_sentencia();
+            cuerpo.add_child_node(sentencia);
+        }
+        cuerpo
+    }
+
+    // --- Condicional: if / elif / else -----------------------------------
+
+    fn parse_condicional(&mut self) -> Nodo {
+        let nivel_h = self.actual().nivel;
+        self.avanzar(); // 'if'
+        let condicion = self.parse_expresion();
+        self.esperar_lexema(":");
+        let cuerpo = self.parse_bloque(nivel_h);
+
+        let mut nodo_if = nodo("if");
+        nodo_if.add_child_node(nodo_con("Condición", vec![condicion]));
+        nodo_if.add_child_node(cuerpo);
+
+        // Cadena de `elif`, siempre al mismo nivel de sangría que el `if`.
+        while !self.es_fin()
+            && !self.hubo_error
+            && self.actual().lexema == "elif"
+            && self.actual().nivel == nivel_h
+        {
+            self.avanzar(); // 'elif'
+            let cond = self.parse_expresion();
+            self.esperar_lexema(":");
+            let cu = self.parse_bloque(nivel_h);
+            let mut nodo_elif = nodo("elif");
+            nodo_elif.add_child_node(nodo_con("Condición", vec![cond]));
+            nodo_elif.add_child_node(cu);
+            nodo_if.add_child_node(nodo_elif);
+        }
+
+        // `else` opcional, también al mismo nivel.
+        if !self.es_fin()
+            && !self.hubo_error
+            && self.actual().lexema == "else"
+            && self.actual().nivel == nivel_h
+        {
+            self.avanzar(); // 'else'
+            self.esperar_lexema(":");
+            let cu = self.parse_bloque(nivel_h);
+            nodo_if.add_child_node(nodo_con("else", vec![cu]));
+        }
+
+        nodo_if
+    }
+
+    // --- Bucle while -----------------------------------------------------
+
+    fn parse_while(&mut self) -> Nodo {
+        let nivel_h = self.actual().nivel;
+        self.avanzar(); // 'while'
+        let condicion = self.parse_expresion();
+        self.esperar_lexema(":");
+        let cuerpo = self.parse_bloque(nivel_h);
+
+        nodo_con(
+            "while",
+            vec![nodo_con("Condición", vec![condicion]), cuerpo],
+        )
+    }
+
+    // --- Bucle for: for variable in iterable ------------------------------
+
+    fn parse_for(&mut self) -> Nodo {
+        let nivel_h = self.actual().nivel;
+        self.avanzar(); // 'for'
+        let variable = self.avanzar().lexema;
+        self.esperar_lexema("in");
+        let iterable = self.parse_expresion();
+        self.esperar_lexema(":");
+        let cuerpo = self.parse_bloque(nivel_h);
+
+        nodo_con(
+            "for",
+            vec![
+                nodo(format!("variable: {}", variable)),
+                nodo_con("iterable", vec![iterable]),
+                cuerpo,
+            ],
+        )
+    }
+
+    // --- return [expresión] ----------------------------------------------
+
+    fn parse_return(&mut self) -> Nodo {
+        let linea = self.actual().linea;
+        self.avanzar(); // 'return'
+        let mut retorno = nodo("return");
+
+        // El valor es opcional; solo lo tomamos si va en la misma línea.
+        if self.actual().linea == linea && self.inicia_expresion() {
+            let valor = self.parse_expresion();
+            retorno.add_child_node(nodo_con("valor", vec![valor]));
+        }
+        retorno
+    }
+
     // --- Punto de entrada ------------------------------------------------
 
     /// Analiza el programa completo. Devuelve `None` si hubo errores
