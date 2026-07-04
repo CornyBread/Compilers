@@ -1,12 +1,13 @@
 // Declaramos los módulos (nuestros archivos separados) que componen el proyecto.
-// mod util;
+mod util;
 // mod stack;
 // mod queue;
 // mod map;
-// mod tree;
+mod tree;
 mod file_reader;
 mod logger;
 mod lexer;
+mod parser;
 
 // Traemos las estructuras a este archivo para poder instanciarlas.
 // use util::Printable;
