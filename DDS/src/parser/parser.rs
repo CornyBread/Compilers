@@ -15,6 +15,11 @@ use crate::tree::Tree;
 
 use super::ast::{nodo, nodo_con, Nodo};
 
+/// Operadores de asignación (simple y aumentada) reconocidos por el parser.
+const OPS_ASIGNACION: &[&str] = &[
+    "=", "+=", "-=", "*=", "/=", "%=", "//=", "**=", "&=", "|=", "^=", ">>=", "<<=",
+];
+
 pub struct Parser {
     tokens: Vec<Token>,
     i: usize,
@@ -266,6 +271,63 @@ impl Parser {
             "Llamada",
             vec![nodo(format!("nombre: {}", nombre)), args],
         )
+    }
+
+    // --- Sentencias que empiezan con un identificador --------------------
+    //
+    // Un identificador al inicio de una sentencia puede ser el comienzo de una
+    // declaración (`x: int = ...`), una asignación (`x = ...`) o una expresión
+    // suelta como una llamada (`print(...)`). Se decide con un token de mirada.
+
+    fn parse_desde_identificador(&mut self) -> Nodo {
+        let siguiente = self.mirar(1).lexema.clone();
+        if siguiente == ":" {
+            self.parse_declaracion()
+        } else if OPS_ASIGNACION.contains(&siguiente.as_str()) {
+            self.parse_asignacion()
+        } else {
+            // Sentencia de expresión (típicamente una llamada).
+            let expr = self.parse_expresion();
+            nodo_con("Expresión", vec![expr])
+        }
+    }
+
+    // --- Declaración: nombre ':' tipo [ '=' expresión ] ------------------
+
+    fn parse_declaracion(&mut self) -> Nodo {
+        let nombre = self.avanzar().lexema; // identificador declarado
+        self.esperar_lexema(":");
+        let tipo = self.avanzar().lexema; // tipo (int, float, str, bool, ...)
+
+        let mut declaracion = nodo("Declaración");
+        declaracion.add_child_node(nodo(format!("tipo: {}", tipo)));
+        declaracion.add_child_node(nodo(format!("nombre: {}", nombre)));
+
+        // El valor inicial es opcional (p. ej. `y: int` sin asignar).
+        if self.coincide_lexema("=") {
+            let valor = self.parse_expresion();
+            declaracion.add_child_node(nodo_con("valor", vec![valor]));
+        }
+
+        declaracion
+    }
+
+    // --- Asignación: nombre op_asig expresión ----------------------------
+
+    fn parse_asignacion(&mut self) -> Nodo {
+        let nombre = self.avanzar().lexema; // identificador destino
+        let operador = self.avanzar().lexema; // '=' o forma aumentada
+
+        let valor = self.parse_expresion();
+
+        let mut asignacion = nodo("Asignación");
+        asignacion.add_child_node(nodo(format!("nombre: {}", nombre)));
+        if operador != "=" {
+            // Asignación aumentada (+=, -=, ...): dejamos constancia del operador.
+            asignacion.add_child_node(nodo(format!("operador: {}", operador)));
+        }
+        asignacion.add_child_node(nodo_con("valor", vec![valor]));
+        asignacion
     }
 
     // --- Punto de entrada ------------------------------------------------
