@@ -27,7 +27,6 @@ pub struct Parser {
     hubo_error: bool,
 }
 
-#[allow(dead_code)] // varios ayudantes se conectan en etapas posteriores
 impl Parser {
     /// Construye el parser a partir de los tokens del lexer.
     pub fn new(tokens: Vec<Token>) -> Self {
@@ -337,6 +336,7 @@ impl Parser {
         let token = self.actual().clone();
         match token.tipo {
             TokenType::PalabraReservada => match token.lexema.as_str() {
+                "def" => self.parse_funcion(),
                 "if" => self.parse_condicional(),
                 "while" => self.parse_while(),
                 "for" => self.parse_for(),
@@ -490,15 +490,66 @@ impl Parser {
         retorno
     }
 
+    // --- Función: def nombre(parámetros) [-> tipo] : bloque --------------
+
+    fn parse_funcion(&mut self) -> Nodo {
+        let nivel_h = self.actual().nivel;
+        self.avanzar(); // 'def'
+        let nombre = self.avanzar().lexema; // nombre de la función
+
+        self.esperar_lexema("(");
+        let mut parametros = nodo("Parámetros");
+        if self.actual().lexema != ")" {
+            loop {
+                let nombre_param = self.avanzar().lexema;
+                // Tipo del parámetro opcional: `nombre: tipo`.
+                if self.coincide_lexema(":") {
+                    let tipo_param = self.avanzar().lexema;
+                    parametros.add_child_node(nodo(format!("{}: {}", nombre_param, tipo_param)));
+                } else {
+                    parametros.add_child_node(nodo(nombre_param));
+                }
+                if !self.coincide_lexema(",") {
+                    break;
+                }
+            }
+        }
+        self.esperar_lexema(")");
+
+        // Tipo de retorno opcional (`-> tipo`); si no aparece, es Void.
+        let retorno = if self.coincide_lexema("->") {
+            self.avanzar().lexema
+        } else {
+            "Void".to_string()
+        };
+        self.esperar_lexema(":");
+        let cuerpo = self.parse_bloque(nivel_h);
+
+        nodo_con(
+            "Función",
+            vec![
+                nodo(format!("nombre: {}", nombre)),
+                parametros,
+                nodo(format!("retorno: {}", retorno)),
+                cuerpo,
+            ],
+        )
+    }
+
     // --- Punto de entrada ------------------------------------------------
 
     /// Analiza el programa completo. Devuelve `None` si hubo errores
     /// (el árbol queda cancelado, según la regla del proyecto).
     pub fn analizar(&mut self) -> Option<Tree<String>> {
-        // En esta primera etapa solo montamos la raíz del árbol; las reglas
-        // (declaración, asignación, operación, etc.) se agregan más adelante.
-        let raiz = nodo("root");
+        let mut raiz = nodo("root");
 
+        // Un programa es una secuencia de sentencias al nivel superior.
+        while !self.es_fin() && !self.hubo_error {
+            let sentencia = self.parse_sentencia();
+            raiz.add_child_node(sentencia);
+        }
+
+        // Regla del proyecto: ante cualquier error, se cancela el árbol.
         if self.hubo_error {
             return None;
         }

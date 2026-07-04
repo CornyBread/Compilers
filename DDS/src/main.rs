@@ -10,109 +10,55 @@ mod lexer;
 mod parser;
 
 // Traemos las estructuras a este archivo para poder instanciarlas.
-// use util::Printable;
-// use stack::Stack;
-// use queue::Queue;
-// use map::Map;
-// use tree::Tree;
+use util::Printable;
 use lexer::Lexer;
-
+use parser::Parser;
 
 fn main() {
-    // println!("--- Probando Pila ---");
-    // let mut my_stack = Stack::new();
-    
-    // // Apilamos elementos. El último en entrar (30) será el primero en salir.
-    // my_stack.push(10);
-    // my_stack.push(20);
-    // my_stack.push(30);
-    // my_stack.print_structure();
-    
-    // // Sacamos el elemento del tope. Lo imprimimos con {:?} porque es de tipo Option.
-    // let popped_item = my_stack.pop();
-    // println!("Elemento desapilado: {:?}", popped_item);
-    // my_stack.print_structure();
+    let ruta = "programa.py";
 
-    // println!("\n--- Probando Cola ---");
-    // let mut my_queue = Queue::new();
-    
-    // // Encolamos elementos. El primero en entrar (10) será el primero en salir.
-    // my_queue.enqueue(10);
-    // my_queue.enqueue(20);
-    // my_queue.enqueue(30);
-    // my_queue.print_structure();
-    
-    // // Sacamos el primer elemento de la fila.
-    // let dequeued_item = my_queue.dequeue();
-    // println!("Elemento desencolado: {:?}", dequeued_item);
-    // my_queue.print_structure();
+    // 1. Análisis léxico: del archivo fuente obtenemos la lista de tokens.
+    let mut lexer = match Lexer::from_file(ruta) {
+        Ok(lexer) => lexer,
+        Err(e) => {
+            eprintln!("No se pudo leer '{}': {}", ruta, e);
+            return;
+        }
+    };
+    let tokens = lexer.tokenize();
 
-    // println!("\n--- Probando Mapa ---");
-    // let mut my_map = Map::new();
+    println!("--- Analizador Léxico ---");
+    println!("Tokens encontrados en '{}': {}", ruta, tokens.len());
 
-    // my_map.insert("uno", 1);
-    // my_map.insert("dos", 2);
-    // my_map.insert("tres", 3);
-    // my_map.print_structure();
+    // Si el léxico tiene errores, no tiene sentido continuar al sintáctico.
+    let errores_lexicos = lexer.logger().entries();
+    if !errores_lexicos.is_empty() {
+        println!("\nErrores léxicos ({}):", errores_lexicos.len());
+        for entry in errores_lexicos {
+            println!("{}", entry);
+        }
+        println!("\nSe detiene el proceso por errores léxicos.");
+        return;
+    }
+    println!("Sin errores léxicos.");
 
-    // let value = my_map.get(&"dos");
-    // println!("Valor encontrado para 'dos': {:?}", value);
-
-    // println!("\n--- Probando Arbol ---");
-    
-    // let mut num_tree: Tree<i32> = Tree::new();
-    // num_tree.set_root(100);
-
-    // if let Some(raiz) = num_tree.find_node_mut(&100) {
-    //     raiz.add_child(50);
-    //     raiz.add_child(150);
-    //     raiz.add_child(200);
-    // }
-
-    // if let Some(nodo_50) = num_tree.find_node_mut(&50) {
-    //     nodo_50.add_child(10);
-    //     nodo_50.add_child(20);
-    //     nodo_50.add_child(30);
-    // }
-
-    // if let Some(nodo_150) = num_tree.find_node_mut(&150) {
-    //     nodo_150.add_child(125);
-    // }
-
-    // if let Some(nodo_200) = num_tree.find_node_mut(&200) {
-    //     nodo_200.add_child(300);
-    // }
-    // if let Some(nodo_300) = num_tree.find_node_mut(&300) {
-    //     nodo_300.add_child(400);
-    // }
-
-    // // Imprimimos la estructura
-    // num_tree.print_structure();
-
-    println!("\n--- Analizador Léxico (Python) ---");
-
-    let ruta = "ejemplo.py";
-    match Lexer::from_file(ruta) {
-        Ok(mut lexer) => {
-            // 2 y 3: extrae/clasifica y devuelve la lista de tokens.
-            let tokens = lexer.tokenize();
-
-            println!("Tokens encontrados en '{}': {}", ruta, tokens.len());
-            for token in &tokens {
-                println!("{}", token);
-            }
-
-            // Reporte de errores léxicos a través del Logger.
-            let errores = lexer.logger().entries();
-            if errores.is_empty() {
-                println!("\nSin errores léxicos.");
-            } else {
-                println!("\nErrores léxicos ({}):", errores.len());
-                for entry in errores {
-                    println!("{}", entry);
-                }
+    // 2. Análisis sintáctico: los tokens son la entrada del parser.
+    println!("\n--- Analizador Sintáctico ---");
+    let mut parser = Parser::new(tokens);
+    match parser.analizar() {
+        // Éxito: se imprime el árbol sintáctico.
+        Some(arbol) => {
+            println!("Árbol sintáctico generado:\n");
+            arbol.print_structure();
+        }
+        // Regla del proyecto: si hay errores, se cancela el árbol y se
+        // imprime el origen (línea y columna) de cada error.
+        None => {
+            let errores = parser.logger().entries();
+            println!("Se canceló el árbol por errores sintácticos ({}):", errores.len());
+            for entry in errores {
+                println!("{}", entry);
             }
         }
-        Err(e) => eprintln!("No se pudo leer '{}': {}", ruta, e),
     }
 }

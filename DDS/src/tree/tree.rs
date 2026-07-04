@@ -13,6 +13,7 @@ impl<T> TreeNode<T> {
         }
     }
 
+    #[allow(dead_code)]
     pub fn add_child(&mut self, value: T) {
         self.children.push(TreeNode::new(value));
     }
@@ -32,6 +33,7 @@ impl<T> Tree<T> {
         Tree { root: None }
     }
 
+    #[allow(dead_code)]
     pub fn set_root(&mut self, value: T) {
         if self.root.is_none() {
             self.root = Some(TreeNode::new(value));
@@ -56,6 +58,7 @@ impl<T> Tree<T> {
     }
 }
 
+#[allow(dead_code)]
 impl<T: PartialEq> Tree<T> {
     pub fn find_node_mut(&mut self, target: &T) -> Option<&mut TreeNode<T>> {
         if let Some(ref mut root_node) = self.root {
