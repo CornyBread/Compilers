@@ -13,7 +13,7 @@ use crate::lexer::token::{Token, TokenType};
 use crate::logger::Logger;
 use crate::tree::Tree;
 
-use super::ast::nodo;
+use super::ast::{nodo, nodo_con, Nodo};
 
 pub struct Parser {
     tokens: Vec<Token>,
@@ -100,6 +100,172 @@ impl Parser {
             .error(format!("{} (cerca de {} en {})", mensaje.into(), cerca, origen));
         self.hubo_error = true;
         nodo("<error>")
+    }
+
+    // --- Operación: expresiones con precedencia --------------------------
+    //
+    // Se resuelve con descenso recursivo por niveles de precedencia (de menor
+    // a mayor): or -> and -> not -> comparación -> +,- -> *,/,%,// -> ** ->
+    // unario -> primario. Cada operador binario crea un nodo cuya etiqueta es
+    // el operador y cuyos dos hijos son los operandos, como en el pizarrón.
+
+    /// Punto de entrada de una expresión.
+    fn parse_expresion(&mut self) -> Nodo {
+        self.parse_o()
+    }
+
+    /// `or` lógico (menor precedencia).
+    fn parse_o(&mut self) -> Nodo {
+        let mut izq = self.parse_y();
+        while self.actual().lexema == "or" {
+            let op = self.avanzar().lexema;
+            let der = self.parse_y();
+            izq = nodo_con(op, vec![izq, der]);
+        }
+        izq
+    }
+
+    /// `and` lógico.
+    fn parse_y(&mut self) -> Nodo {
+        let mut izq = self.parse_no();
+        while self.actual().lexema == "and" {
+            let op = self.avanzar().lexema;
+            let der = self.parse_no();
+            izq = nodo_con(op, vec![izq, der]);
+        }
+        izq
+    }
+
+    /// `not` lógico (unario prefijo).
+    fn parse_no(&mut self) -> Nodo {
+        if self.actual().lexema == "not" {
+            let op = self.avanzar().lexema;
+            let expr = self.parse_no();
+            return nodo_con(op, vec![expr]);
+        }
+        self.parse_comparacion()
+    }
+
+    /// Comparaciones: <, >, <=, >=, ==, !=
+    fn parse_comparacion(&mut self) -> Nodo {
+        let mut izq = self.parse_suma();
+        while matches!(
+            self.actual().lexema.as_str(),
+            "<" | ">" | "<=" | ">=" | "==" | "!="
+        ) {
+            let op = self.avanzar().lexema;
+            let der = self.parse_suma();
+            izq = nodo_con(op, vec![izq, der]);
+        }
+        izq
+    }
+
+    /// Suma y resta.
+    fn parse_suma(&mut self) -> Nodo {
+        let mut izq = self.parse_termino();
+        while matches!(self.actual().lexema.as_str(), "+" | "-") {
+            let op = self.avanzar().lexema;
+            let der = self.parse_termino();
+            izq = nodo_con(op, vec![izq, der]);
+        }
+        izq
+    }
+
+    /// Multiplicación, división, módulo y división entera.
+    fn parse_termino(&mut self) -> Nodo {
+        let mut izq = self.parse_unario();
+        while matches!(self.actual().lexema.as_str(), "*" | "/" | "%" | "//") {
+            let op = self.avanzar().lexema;
+            let der = self.parse_unario();
+            izq = nodo_con(op, vec![izq, der]);
+        }
+        izq
+    }
+
+    /// Signo unario (`-x`, `+x`).
+    fn parse_unario(&mut self) -> Nodo {
+        if matches!(self.actual().lexema.as_str(), "-" | "+") {
+            let op = self.avanzar().lexema;
+            let expr = self.parse_unario();
+            return nodo_con(format!("{} (unario)", op), vec![expr]);
+        }
+        self.parse_potencia()
+    }
+
+    /// Potencia `**` (asociativa a la derecha, mayor precedencia binaria).
+    fn parse_potencia(&mut self) -> Nodo {
+        let base = self.parse_primario();
+        if self.actual().lexema == "**" {
+            let op = self.avanzar().lexema;
+            let exponente = self.parse_unario();
+            return nodo_con(op, vec![base, exponente]);
+        }
+        base
+    }
+
+    /// Elemento primario: literal, identificador, llamada o `( expresión )`.
+    fn parse_primario(&mut self) -> Nodo {
+        let token = self.actual().clone();
+        match token.tipo {
+            // Un valor literal (entero, flotante, cadena, booleano) es una hoja.
+            TokenType::Literal(_) => {
+                self.avanzar();
+                nodo(token.lexema)
+            }
+            // Un identificador es una hoja, salvo que le siga '(' -> es llamada.
+            TokenType::Identificador => {
+                self.avanzar();
+                if self.actual().lexema == "(" {
+                    self.parse_llamada(token.lexema)
+                } else {
+                    nodo(token.lexema)
+                }
+            }
+            // `None` (y otras palabras reservadas usadas como valor).
+            TokenType::PalabraReservada if token.lexema == "None" => {
+                self.avanzar();
+                nodo(token.lexema)
+            }
+            // Expresión entre paréntesis.
+            TokenType::Simbolo if token.lexema == "(" => {
+                self.avanzar();
+                let expr = self.parse_expresion();
+                self.esperar_lexema(")");
+                expr
+            }
+            _ => {
+                let marcador = self.error("Se esperaba una expresión");
+                // Consumimos un token para garantizar avance y evitar bucles.
+                if !self.es_fin() {
+                    self.avanzar();
+                }
+                marcador
+            }
+        }
+    }
+
+    // --- Llamada: identificador '(' argumentos ')' -----------------------
+
+    /// Analiza una llamada a función `nombre(arg1, arg2, ...)`.
+    /// Al entrar, el token actual es el '(' de apertura.
+    fn parse_llamada(&mut self, nombre: String) -> Nodo {
+        self.avanzar(); // consume '('
+        let mut args = nodo("Args");
+        if self.actual().lexema != ")" {
+            loop {
+                let arg = self.parse_expresion();
+                args.add_child_node(arg);
+                if !self.coincide_lexema(",") {
+                    break;
+                }
+            }
+        }
+        self.esperar_lexema(")");
+
+        nodo_con(
+            "Llamada",
+            vec![nodo(format!("nombre: {}", nombre)), args],
+        )
     }
 
     // --- Punto de entrada ------------------------------------------------
