@@ -1,5 +1,3 @@
-# Programa de ejemplo para el analizador sintáctico (Proyecto 3).
-# Cubre: declaración, asignación, operación, llamada, condicional y bucles.
 
 def factorial(n: int) -> int:
     resultado: int = 1

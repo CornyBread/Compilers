@@ -1,5 +1,4 @@
 # Programa con errores semánticos a propósito (Proyecto 4).
-# Cada sección marca uno de los casos del pizarrón (21/7).
 
 total: int = 0
 

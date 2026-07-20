@@ -1,2 +1,0 @@
-Línea 1: Este es el inicio del archivo.
-Línea 2: Esto se agregó sin borrar la Línea 1.
