@@ -21,7 +21,7 @@ fn main() {
     // Se puede pasar otro archivo por argumento: `cargo run -- otro.py`.
     let ruta = std::env::args()
         .nth(1)
-        .unwrap_or_else(|| "programa.py".to_string());
+        .unwrap_or_else(|| "programa_error_semantico.py".to_string());
     let ruta = ruta.as_str();
 
     // 1. Análisis léxico: del archivo fuente obtenemos la lista de tokens.
@@ -98,8 +98,7 @@ fn main() {
                 }
             }
         }
-        // Regla del proyecto: si hay errores, se cancela el árbol y se
-        // imprime el origen (línea y columna) de cada error.
+
         None => {
             let errores = parser.logger().entries();
             println!("Se canceló el árbol por errores sintácticos ({}):", errores.len());

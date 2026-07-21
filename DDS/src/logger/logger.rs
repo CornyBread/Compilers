@@ -1,8 +1,8 @@
+use chrono::Local;
 use std::fmt;
 use std::fs::File;
 use std::io::{self, Write};
 use std::path::Path;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LogLevel {
@@ -27,7 +27,7 @@ impl fmt::Display for LogLevel {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LogEntry {
-    pub timestamp: u64,
+    pub timestamp: String,
     pub logger_name: Option<String>,
     pub level: LogLevel,
     pub message: String,
@@ -104,10 +104,7 @@ impl Logger {
         Ok(())
     }
 
-    fn current_timestamp() -> u64 {
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|duration| duration.as_secs())
-            .unwrap_or_default()
+    fn current_timestamp() -> String {
+        Local::now().format("%Y-%m-%d %H:%M:%S").to_string()
     }
 }

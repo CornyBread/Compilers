@@ -1,4 +1,3 @@
-# Programa con errores semánticos a propósito (Proyecto 4).
 
 total: int = 0
 

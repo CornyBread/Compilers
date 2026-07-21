@@ -1,14 +1,6 @@
-// Tabla de Símbolos — Proyecto 4 (Analizador Semántico).
-//
-// Aquí quedan registradas TODAS las declaraciones del programa: variables,
-// parámetros y funciones. La idea del pizarrón: cuando el programa se
-// ejecute, el intérprete consulta esta tabla directamente y ya no necesita
-// recorrer otra vez el árbol para verificar las declaraciones.
-
 use crate::util::Printable;
 use std::fmt;
 
-/// Qué clase de símbolo es cada entrada de la tabla.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Categoria {
     Variable,
@@ -27,22 +19,15 @@ impl fmt::Display for Categoria {
     }
 }
 
-/// Una entrada de la tabla: una declaración del programa.
 #[derive(Debug, Clone)]
 pub struct Simbolo {
     pub nombre: String,
     pub categoria: Categoria,
-    /// Tipo de la variable/parámetro, o tipo de retorno si es función.
     pub tipo: String,
-    /// Ámbito donde vive: "global", "main", "main::if#1", ...
     pub ambito: String,
-    /// Solo funciones: (nombre, tipo) de cada parámetro, en orden.
     pub parametros: Vec<(String, String)>,
-    /// Solo funciones nativas como `print`: acepta cualquier cantidad de argumentos.
     pub variadica: bool,
-    /// ¿Ya recibió un valor? (una declaración sin `=` queda sin inicializar).
     pub inicializado: bool,
-    /// ¿El programa lo usa en algún punto? (sirve para avisar de dead code).
     pub usado: bool,
 }
 
@@ -77,7 +62,7 @@ impl Simbolo {
             ambito: ambito.into(),
             parametros: Vec::new(),
             variadica: false,
-            inicializado: true, // un parámetro siempre llega con valor
+            inicializado: true,
             usado: false,
         }
     }
@@ -101,8 +86,6 @@ impl Simbolo {
     }
 }
 
-/// La tabla en sí: la lista de símbolos en el orden en que se declararon
-/// (el mismo orden en que el árbol se recorre de izquierda a derecha).
 pub struct TablaSimbolos {
     simbolos: Vec<Simbolo>,
 }
@@ -114,15 +97,12 @@ impl TablaSimbolos {
         }
     }
 
-    /// ¿Ya existe un símbolo con ese nombre en ese ámbito exacto?
     pub fn existe(&self, nombre: &str, ambito: &str) -> bool {
         self.simbolos
             .iter()
             .any(|s| s.nombre == nombre && s.ambito == ambito)
     }
 
-    /// Registra una declaración. Devuelve `false` si el nombre ya existía en
-    /// ese mismo ámbito -> caso "Redeclaraciones" del pizarrón.
     pub fn declarar(&mut self, simbolo: Simbolo) -> bool {
         if self.existe(&simbolo.nombre, &simbolo.ambito) {
             return false;
@@ -131,9 +111,6 @@ impl TablaSimbolos {
         true
     }
 
-    /// Busca un nombre recorriendo los ámbitos activos del más interno al más
-    /// externo. Si el símbolo existe pero su ámbito ya no está activo, no se
-    /// encuentra -> caso "Datos fuera de bloque".
     pub fn resolver_mut(&mut self, nombre: &str, ambitos: &[String]) -> Option<&mut Simbolo> {
         for ambito in ambitos.iter().rev() {
             let pos = self
@@ -160,7 +137,6 @@ impl Printable for TablaSimbolos {
             return;
         }
 
-        // Cada fila: nombre | categoría | tipo | ámbito | detalle.
         let filas: Vec<[String; 5]> = self
             .simbolos
             .iter()
@@ -196,7 +172,6 @@ impl Printable for TablaSimbolos {
 
         let encabezado = ["Nombre", "Categoría", "Tipo", "Ámbito", "Detalle"];
 
-        // Ancho de cada columna: el máximo entre encabezado y todas las filas.
         let mut anchos: Vec<usize> = encabezado.iter().map(|t| t.chars().count()).collect();
         for fila in &filas {
             for (i, celda) in fila.iter().enumerate() {
