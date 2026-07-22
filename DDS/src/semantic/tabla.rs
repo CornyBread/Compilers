@@ -29,6 +29,7 @@ pub struct Simbolo {
     pub variadica: bool,
     pub inicializado: bool,
     pub usado: bool,
+    pub linea: usize,
 }
 
 impl Simbolo {
@@ -37,6 +38,7 @@ impl Simbolo {
         tipo: impl Into<String>,
         ambito: impl Into<String>,
         inicializado: bool,
+        linea: usize,
     ) -> Self {
         Simbolo {
             nombre: nombre.into(),
@@ -47,6 +49,7 @@ impl Simbolo {
             variadica: false,
             inicializado,
             usado: false,
+            linea,
         }
     }
 
@@ -54,6 +57,7 @@ impl Simbolo {
         nombre: impl Into<String>,
         tipo: impl Into<String>,
         ambito: impl Into<String>,
+        linea: usize,
     ) -> Self {
         Simbolo {
             nombre: nombre.into(),
@@ -64,6 +68,7 @@ impl Simbolo {
             variadica: false,
             inicializado: true,
             usado: false,
+            linea,
         }
     }
 
@@ -72,6 +77,7 @@ impl Simbolo {
         retorno: impl Into<String>,
         ambito: impl Into<String>,
         parametros: Vec<(String, String)>,
+        linea: usize,
     ) -> Self {
         Simbolo {
             nombre: nombre.into(),
@@ -82,6 +88,7 @@ impl Simbolo {
             variadica: false,
             inicializado: true,
             usado: false,
+            linea,
         }
     }
 }

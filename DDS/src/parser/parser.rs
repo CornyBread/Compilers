@@ -13,7 +13,7 @@ use crate::lexer::token::{Token, TokenType};
 use crate::logger::Logger;
 use crate::tree::Tree;
 
-use super::ast::{nodo, nodo_con, Nodo};
+use super::ast::{nodo, nodo_con, nodo_con_l, nodo_l, Nodo};
 
 /// Operadores de asignación (simple y aumentada) reconocidos por el parser.
 const OPS_ASIGNACION: &[&str] = &[
@@ -94,6 +94,7 @@ impl Parser {
     /// marca el árbol como inválido y devuelve un nodo marcador `<error>`.
     fn error(&mut self, mensaje: impl Into<String>) -> super::ast::Nodo {
         let token = self.actual();
+        let linea = token.linea;
         let origen = format!("L{}:C{}", token.linea, token.columna);
         let cerca = if token.lexema.is_empty() {
             "<fin de archivo>".to_string()
@@ -103,7 +104,7 @@ impl Parser {
         self.logger
             .error(format!("{} (cerca de {} en {})", mensaje.into(), cerca, origen));
         self.hubo_error = true;
-        nodo("<error>")
+        nodo_l("<error>", linea)
     }
 
     // --- Operación: expresiones con precedencia --------------------------
@@ -122,9 +123,10 @@ impl Parser {
     fn parse_o(&mut self) -> Nodo {
         let mut izq = self.parse_y();
         while self.actual().lexema == "or" {
+            let linea = self.actual().linea;
             let op = self.avanzar().lexema;
             let der = self.parse_y();
-            izq = nodo_con(op, vec![izq, der]);
+            izq = nodo_con_l(op, linea, vec![izq, der]);
         }
         izq
     }
@@ -133,9 +135,10 @@ impl Parser {
     fn parse_y(&mut self) -> Nodo {
         let mut izq = self.parse_no();
         while self.actual().lexema == "and" {
+            let linea = self.actual().linea;
             let op = self.avanzar().lexema;
             let der = self.parse_no();
-            izq = nodo_con(op, vec![izq, der]);
+            izq = nodo_con_l(op, linea, vec![izq, der]);
         }
         izq
     }
@@ -143,9 +146,10 @@ impl Parser {
     /// `not` lógico (unario prefijo).
     fn parse_no(&mut self) -> Nodo {
         if self.actual().lexema == "not" {
+            let linea = self.actual().linea;
             let op = self.avanzar().lexema;
             let expr = self.parse_no();
-            return nodo_con(op, vec![expr]);
+            return nodo_con_l(op, linea, vec![expr]);
         }
         self.parse_comparacion()
     }
@@ -157,9 +161,10 @@ impl Parser {
             self.actual().lexema.as_str(),
             "<" | ">" | "<=" | ">=" | "==" | "!="
         ) {
+            let linea = self.actual().linea;
             let op = self.avanzar().lexema;
             let der = self.parse_suma();
-            izq = nodo_con(op, vec![izq, der]);
+            izq = nodo_con_l(op, linea, vec![izq, der]);
         }
         izq
     }
@@ -168,9 +173,10 @@ impl Parser {
     fn parse_suma(&mut self) -> Nodo {
         let mut izq = self.parse_termino();
         while matches!(self.actual().lexema.as_str(), "+" | "-") {
+            let linea = self.actual().linea;
             let op = self.avanzar().lexema;
             let der = self.parse_termino();
-            izq = nodo_con(op, vec![izq, der]);
+            izq = nodo_con_l(op, linea, vec![izq, der]);
         }
         izq
     }
@@ -179,9 +185,10 @@ impl Parser {
     fn parse_termino(&mut self) -> Nodo {
         let mut izq = self.parse_unario();
         while matches!(self.actual().lexema.as_str(), "*" | "/" | "%" | "//") {
+            let linea = self.actual().linea;
             let op = self.avanzar().lexema;
             let der = self.parse_unario();
-            izq = nodo_con(op, vec![izq, der]);
+            izq = nodo_con_l(op, linea, vec![izq, der]);
         }
         izq
     }
@@ -189,9 +196,10 @@ impl Parser {
     /// Signo unario (`-x`, `+x`).
     fn parse_unario(&mut self) -> Nodo {
         if matches!(self.actual().lexema.as_str(), "-" | "+") {
+            let linea = self.actual().linea;
             let op = self.avanzar().lexema;
             let expr = self.parse_unario();
-            return nodo_con(format!("{} (unario)", op), vec![expr]);
+            return nodo_con_l(format!("{} (unario)", op), linea, vec![expr]);
         }
         self.parse_potencia()
     }
@@ -200,9 +208,10 @@ impl Parser {
     fn parse_potencia(&mut self) -> Nodo {
         let base = self.parse_primario();
         if self.actual().lexema == "**" {
+            let linea = self.actual().linea;
             let op = self.avanzar().lexema;
             let exponente = self.parse_unario();
-            return nodo_con(op, vec![base, exponente]);
+            return nodo_con_l(op, linea, vec![base, exponente]);
         }
         base
     }
@@ -214,21 +223,21 @@ impl Parser {
             // Un valor literal (entero, flotante, cadena, booleano) es una hoja.
             TokenType::Literal(_) => {
                 self.avanzar();
-                nodo(token.lexema)
+                nodo_l(token.lexema, token.linea)
             }
             // Un identificador es una hoja, salvo que le siga '(' -> es llamada.
             TokenType::Identificador => {
                 self.avanzar();
                 if self.actual().lexema == "(" {
-                    self.parse_llamada(token.lexema)
+                    self.parse_llamada(token.lexema, token.linea)
                 } else {
-                    nodo(token.lexema)
+                    nodo_l(token.lexema, token.linea)
                 }
             }
             // `None` (y otras palabras reservadas usadas como valor).
             TokenType::PalabraReservada if token.lexema == "None" => {
                 self.avanzar();
-                nodo(token.lexema)
+                nodo_l(token.lexema, token.linea)
             }
             // Expresión entre paréntesis.
             TokenType::Simbolo if token.lexema == "(" => {
@@ -252,7 +261,7 @@ impl Parser {
 
     /// Analiza una llamada a función `nombre(arg1, arg2, ...)`.
     /// Al entrar, el token actual es el '(' de apertura.
-    fn parse_llamada(&mut self, nombre: String) -> Nodo {
+    fn parse_llamada(&mut self, nombre: String, linea: usize) -> Nodo {
         self.avanzar(); // consume '('
         let mut args = nodo("Args");
         if self.actual().lexema != ")" {
@@ -266,8 +275,9 @@ impl Parser {
         }
         self.esperar_lexema(")");
 
-        nodo_con(
+        nodo_con_l(
             "Llamada",
+            linea,
             vec![nodo(format!("nombre: {}", nombre)), args],
         )
     }
@@ -286,19 +296,21 @@ impl Parser {
             self.parse_asignacion()
         } else {
             // Sentencia de expresión (típicamente una llamada).
+            let linea = self.actual().linea;
             let expr = self.parse_expresion();
-            nodo_con("Expresión", vec![expr])
+            nodo_con_l("Expresión", linea, vec![expr])
         }
     }
 
     // --- Declaración: nombre ':' tipo [ '=' expresión ] ------------------
 
     fn parse_declaracion(&mut self) -> Nodo {
+        let linea = self.actual().linea;
         let nombre = self.avanzar().lexema; // identificador declarado
         self.esperar_lexema(":");
         let tipo = self.avanzar().lexema; // tipo (int, float, str, bool, ...)
 
-        let mut declaracion = nodo("Declaración");
+        let mut declaracion = nodo_l("Declaración", linea);
         declaracion.add_child_node(nodo(format!("tipo: {}", tipo)));
         declaracion.add_child_node(nodo(format!("nombre: {}", nombre)));
 
@@ -314,12 +326,13 @@ impl Parser {
     // --- Asignación: nombre op_asig expresión ----------------------------
 
     fn parse_asignacion(&mut self) -> Nodo {
+        let linea = self.actual().linea;
         let nombre = self.avanzar().lexema; // identificador destino
         let operador = self.avanzar().lexema; // '=' o forma aumentada
 
         let valor = self.parse_expresion();
 
-        let mut asignacion = nodo("Asignación");
+        let mut asignacion = nodo_l("Asignación", linea);
         asignacion.add_child_node(nodo(format!("nombre: {}", nombre)));
         if operador != "=" {
             // Asignación aumentada (+=, -=, ...): dejamos constancia del operador.
@@ -399,12 +412,13 @@ impl Parser {
 
     fn parse_condicional(&mut self) -> Nodo {
         let nivel_h = self.actual().nivel;
+        let linea = self.actual().linea;
         self.avanzar(); // 'if'
         let condicion = self.parse_expresion();
         self.esperar_lexema(":");
         let cuerpo = self.parse_bloque(nivel_h);
 
-        let mut nodo_if = nodo("if");
+        let mut nodo_if = nodo_l("if", linea);
         nodo_if.add_child_node(nodo_con("Condición", vec![condicion]));
         nodo_if.add_child_node(cuerpo);
 
@@ -414,11 +428,12 @@ impl Parser {
             && self.actual().lexema == "elif"
             && self.actual().nivel == nivel_h
         {
+            let linea_elif = self.actual().linea;
             self.avanzar(); // 'elif'
             let cond = self.parse_expresion();
             self.esperar_lexema(":");
             let cu = self.parse_bloque(nivel_h);
-            let mut nodo_elif = nodo("elif");
+            let mut nodo_elif = nodo_l("elif", linea_elif);
             nodo_elif.add_child_node(nodo_con("Condición", vec![cond]));
             nodo_elif.add_child_node(cu);
             nodo_if.add_child_node(nodo_elif);
@@ -443,13 +458,15 @@ impl Parser {
 
     fn parse_while(&mut self) -> Nodo {
         let nivel_h = self.actual().nivel;
+        let linea = self.actual().linea;
         self.avanzar(); // 'while'
         let condicion = self.parse_expresion();
         self.esperar_lexema(":");
         let cuerpo = self.parse_bloque(nivel_h);
 
-        nodo_con(
+        nodo_con_l(
             "while",
+            linea,
             vec![nodo_con("Condición", vec![condicion]), cuerpo],
         )
     }
@@ -458,6 +475,7 @@ impl Parser {
 
     fn parse_for(&mut self) -> Nodo {
         let nivel_h = self.actual().nivel;
+        let linea = self.actual().linea;
         self.avanzar(); // 'for'
         let variable = self.avanzar().lexema;
         self.esperar_lexema("in");
@@ -465,8 +483,9 @@ impl Parser {
         self.esperar_lexema(":");
         let cuerpo = self.parse_bloque(nivel_h);
 
-        nodo_con(
+        nodo_con_l(
             "for",
+            linea,
             vec![
                 nodo(format!("variable: {}", variable)),
                 nodo_con("iterable", vec![iterable]),
@@ -480,7 +499,7 @@ impl Parser {
     fn parse_return(&mut self) -> Nodo {
         let linea = self.actual().linea;
         self.avanzar(); // 'return'
-        let mut retorno = nodo("return");
+        let mut retorno = nodo_l("return", linea);
 
         // El valor es opcional; solo lo tomamos si va en la misma línea.
         if self.actual().linea == linea && self.inicia_expresion() {
@@ -494,6 +513,7 @@ impl Parser {
 
     fn parse_funcion(&mut self) -> Nodo {
         let nivel_h = self.actual().nivel;
+        let linea = self.actual().linea;
         self.avanzar(); // 'def'
         let nombre = self.avanzar().lexema; // nombre de la función
 
@@ -525,8 +545,9 @@ impl Parser {
         self.esperar_lexema(":");
         let cuerpo = self.parse_bloque(nivel_h);
 
-        nodo_con(
+        nodo_con_l(
             "Función",
+            linea,
             vec![
                 nodo(format!("nombre: {}", nombre)),
                 parametros,

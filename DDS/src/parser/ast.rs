@@ -23,3 +23,13 @@ pub fn nodo_con(etiqueta: impl Into<String>, hijos: Vec<Nodo>) -> Nodo {
     }
     n
 }
+
+/// Crea un nodo hoja marcado con su línea de origen.
+pub fn nodo_l(etiqueta: impl Into<String>, linea: usize) -> Nodo {
+    nodo(etiqueta).con_linea(linea)
+}
+
+/// Crea un nodo con hijos, marcado con su línea de origen.
+pub fn nodo_con_l(etiqueta: impl Into<String>, linea: usize, hijos: Vec<Nodo>) -> Nodo {
+    nodo_con(etiqueta, hijos).con_linea(linea)
+}

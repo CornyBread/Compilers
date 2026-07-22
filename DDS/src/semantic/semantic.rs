@@ -17,13 +17,14 @@ pub struct AnalizadorSemantico {
     retorno_actual: String,
     tiene_return: bool,
     hubo_error: bool,
+    linea_actual: usize,
 }
 
 impl AnalizadorSemantico {
     pub fn new() -> Self {
         let mut tabla = TablaSimbolos::new();
 
-        let mut print_fn = Simbolo::funcion("print", "Void", "global", Vec::new());
+        let mut print_fn = Simbolo::funcion("print", "Void", "global", Vec::new(), 0);
         print_fn.variadica = true;
         print_fn.usado = true;
         tabla.declarar(print_fn);
@@ -33,6 +34,7 @@ impl AnalizadorSemantico {
             "range",
             "global",
             vec![("fin".to_string(), "int".to_string())],
+            0,
         );
         range_fn.usado = true;
         tabla.declarar(range_fn);
@@ -46,6 +48,7 @@ impl AnalizadorSemantico {
             retorno_actual: "Void".to_string(),
             tiene_return: false,
             hubo_error: false,
+            linea_actual: 0,
         }
     }
 
@@ -64,14 +67,22 @@ impl AnalizadorSemantico {
 
 
     fn error(&mut self, mensaje: impl Into<String>) {
-        self.logger.error(mensaje.into());
+        self.logger.error(format!("{} (línea {})", mensaje.into(), self.linea_actual));
         self.hubo_error = true;
     }
 
     fn advertencia(&mut self, mensaje: impl Into<String>) {
-        self.logger.warn(mensaje.into());
+        self.logger.warn(format!("{} (línea {})", mensaje.into(), self.linea_actual));
     }
 
+    /// Actualiza la línea de origen usada al reportar errores/advertencias,
+    /// si el nodo trae una línea conocida (los nodos auxiliares como
+    /// "nombre: x" o "tipo: x" no la traen y no deben pisar la actual).
+    fn marcar_linea(&mut self, nodo: &Nodo) {
+        if nodo.linea != 0 {
+            self.linea_actual = nodo.linea;
+        }
+    }
 
     fn hijo<'a>(nodo: &'a Nodo, etiqueta: &str) -> Option<&'a Nodo> {
         nodo.children.iter().find(|h| h.value == etiqueta)
@@ -119,29 +130,34 @@ impl AnalizadorSemantico {
             self.error("Función main: el programa no define la función main()");
         }
 
-        let sin_usar: Vec<String> = self
+        let sin_usar: Vec<(String, usize)> = self
             .tabla
             .simbolos()
             .iter()
             .filter(|s| !s.usado && s.nombre != "main")
             .filter(|s| s.categoria != Categoria::Parametro)
-            .map(|s| match s.categoria {
-                Categoria::Funcion => {
-                    format!("Dead code: la función '{}' nunca se llama", s.nombre)
-                }
-                _ => format!(
-                    "Dead code: la variable '{}' (ámbito '{}') nunca se usa",
-                    s.nombre, s.ambito
-                ),
+            .map(|s| {
+                let mensaje = match s.categoria {
+                    Categoria::Funcion => {
+                        format!("Dead code: la función '{}' nunca se llama", s.nombre)
+                    }
+                    _ => format!(
+                        "Dead code: la variable '{}' (ámbito '{}') nunca se usa",
+                        s.nombre, s.ambito
+                    ),
+                };
+                (mensaje, s.linea)
             })
             .collect();
-        for mensaje in sin_usar {
+        for (mensaje, linea) in sin_usar {
+            self.linea_actual = linea;
             self.advertencia(mensaje);
         }
     }
 
 
     fn analizar_nivel_superior(&mut self, sentencia: &Nodo) {
+        self.marcar_linea(sentencia);
         match sentencia.value.as_str() {
             "Función" => self.analizar_funcion(sentencia),
             "Declaración" => self.analizar_declaracion(sentencia),
@@ -171,6 +187,7 @@ impl AnalizadorSemantico {
 
 
     fn analizar_funcion(&mut self, nodo: &Nodo) {
+        self.marcar_linea(nodo);
         let nombre = Self::valor_de(nodo, "nombre").unwrap_or_default();
 
         if let Some(externa) = &self.funcion_actual {
@@ -213,7 +230,7 @@ impl AnalizadorSemantico {
             self.error("Función main: main() no debe recibir parámetros");
         }
 
-        let simbolo = Simbolo::funcion(nombre.clone(), retorno.clone(), "global", parametros.clone());
+        let simbolo = Simbolo::funcion(nombre.clone(), retorno.clone(), "global", parametros.clone(), nodo.linea);
         if !self.tabla.declarar(simbolo) {
             self.error(format!(
                 "Redeclaración: la función '{}' ya estaba declarada",
@@ -228,7 +245,7 @@ impl AnalizadorSemantico {
         self.tiene_return = false;
 
         for (p_nombre, p_tipo) in &parametros {
-            let parametro = Simbolo::parametro(p_nombre.clone(), p_tipo.clone(), nombre.clone());
+            let parametro = Simbolo::parametro(p_nombre.clone(), p_tipo.clone(), nombre.clone(), nodo.linea);
             if !self.tabla.declarar(parametro) {
                 self.error(format!(
                     "Redeclaración: el parámetro '{}' está repetido en la función '{}'",
@@ -278,6 +295,7 @@ impl AnalizadorSemantico {
     }
 
     fn analizar_sentencia(&mut self, sentencia: &Nodo) {
+        self.marcar_linea(sentencia);
         match sentencia.value.as_str() {
             "Declaración" => self.analizar_declaracion(sentencia),
             "Asignación" => self.analizar_asignacion(sentencia),
@@ -295,6 +313,7 @@ impl AnalizadorSemantico {
 
 
     fn analizar_declaracion(&mut self, nodo: &Nodo) {
+        self.marcar_linea(nodo);
         let nombre = Self::valor_de(nodo, "nombre").unwrap_or_default();
         let tipo = Self::valor_de(nodo, "tipo").unwrap_or_default();
 
@@ -319,8 +338,10 @@ impl AnalizadorSemantico {
             tipo_declarado,
             self.ambito_actual(),
             inicializado,
+            nodo.linea,
         );
         if !self.tabla.declarar(simbolo) {
+            self.marcar_linea(nodo);
             self.error(format!(
                 "Redeclaración: '{}' ya existe en el ámbito '{}'",
                 nombre,
@@ -330,6 +351,7 @@ impl AnalizadorSemantico {
     }
 
     fn analizar_asignacion(&mut self, nodo: &Nodo) {
+        self.marcar_linea(nodo);
         let nombre = Self::valor_de(nodo, "nombre").unwrap_or_default();
         let operador = Self::valor_de(nodo, "operador");
 
@@ -337,6 +359,7 @@ impl AnalizadorSemantico {
             Some(valor) => self.tipo_expresion(valor),
             None => TIPO_ERROR.to_string(),
         };
+        self.marcar_linea(nodo);
 
         let destino = self
             .tabla
@@ -391,6 +414,7 @@ impl AnalizadorSemantico {
                         tipo_valor,
                         self.ambito_actual(),
                         true,
+                        nodo.linea,
                     );
                     self.tabla.declarar(simbolo);
                 }
@@ -412,6 +436,7 @@ impl AnalizadorSemantico {
     }
 
     fn analizar_if(&mut self, nodo: &Nodo) {
+        self.marcar_linea(nodo);
         self.analizar_condicion(nodo, "if");
         if let Some(cuerpo) = Self::hijo(nodo, "Cuerpo") {
             self.abrir_bloque("if");
@@ -422,6 +447,7 @@ impl AnalizadorSemantico {
         for rama in &nodo.children {
             match rama.value.as_str() {
                 "elif" => {
+                    self.marcar_linea(rama);
                     self.analizar_condicion(rama, "elif");
                     if let Some(cuerpo) = Self::hijo(rama, "Cuerpo") {
                         self.abrir_bloque("elif");
@@ -442,6 +468,7 @@ impl AnalizadorSemantico {
     }
 
     fn analizar_while(&mut self, nodo: &Nodo) {
+        self.marcar_linea(nodo);
         self.analizar_condicion(nodo, "while");
         if let Some(cuerpo) = Self::hijo(nodo, "Cuerpo") {
             self.abrir_bloque("while");
@@ -451,6 +478,7 @@ impl AnalizadorSemantico {
     }
 
     fn analizar_for(&mut self, nodo: &Nodo) {
+        self.marcar_linea(nodo);
         let variable = Self::valor_de(nodo, "variable").unwrap_or_default();
 
         let tipo_iterable = match Self::hijo(nodo, "iterable") {
@@ -472,7 +500,7 @@ impl AnalizadorSemantico {
         };
 
         self.abrir_bloque("for");
-        let simbolo = Simbolo::variable(variable, tipo_variable, self.ambito_actual(), true);
+        let simbolo = Simbolo::variable(variable, tipo_variable, self.ambito_actual(), true, nodo.linea);
         self.tabla.declarar(simbolo);
         if let Some(cuerpo) = Self::hijo(nodo, "Cuerpo") {
             self.analizar_cuerpo(cuerpo);
@@ -481,6 +509,7 @@ impl AnalizadorSemantico {
     }
 
     fn analizar_return(&mut self, nodo: &Nodo) {
+        self.marcar_linea(nodo);
         let funcion = match self.funcion_actual.clone() {
             Some(f) => f,
             None => {
@@ -518,6 +547,7 @@ impl AnalizadorSemantico {
 
 
     fn analizar_llamada(&mut self, nodo: &Nodo) -> String {
+        self.marcar_linea(nodo);
         let nombre = Self::valor_de(nodo, "nombre").unwrap_or_default();
 
         let mut tipos_args: Vec<String> = Vec::new();
@@ -596,6 +626,7 @@ impl AnalizadorSemantico {
 
 
     fn tipo_expresion(&mut self, nodo: &Nodo) -> String {
+        self.marcar_linea(nodo);
         let etiqueta = nodo.value.as_str();
 
         if matches!(etiqueta, "Expresión" | "valor" | "Condición" | "iterable") {

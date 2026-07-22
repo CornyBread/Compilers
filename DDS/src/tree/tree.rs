@@ -3,6 +3,8 @@ use crate::util::Printable;
 pub struct TreeNode<T> {
     pub value: T,
     pub children: Vec<TreeNode<T>>,
+    /// Línea de origen en el código fuente (0 si no aplica/no se conoce).
+    pub linea: usize,
 }
 
 impl<T> TreeNode<T> {
@@ -10,7 +12,14 @@ impl<T> TreeNode<T> {
         TreeNode {
             value,
             children: Vec::new(),
+            linea: 0,
         }
+    }
+
+    #[allow(dead_code)]
+    pub fn con_linea(mut self, linea: usize) -> Self {
+        self.linea = linea;
+        self
     }
 
     #[allow(dead_code)]
