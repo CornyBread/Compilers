@@ -9,6 +9,7 @@ mod logger;
 mod lexer;
 mod parser;
 mod semantic;
+mod transpiler;
 
 // Traemos las estructuras a este archivo para poder instanciarlas.
 use util::Printable;
@@ -16,12 +17,13 @@ use lexer::Lexer;
 use logger::LogLevel;
 use parser::Parser;
 use semantic::AnalizadorSemantico;
+use transpiler::Transpilador;
 
 fn main() {
     // Se puede pasar otro archivo por argumento: `cargo run -- otro.py`.
     let ruta = std::env::args()
         .nth(1)
-        .unwrap_or_else(|| "programa_error_semantico.py".to_string());
+        .unwrap_or_else(|| "programa.py".to_string());
     let ruta = ruta.as_str();
 
     // 1. Análisis léxico: del archivo fuente obtenemos la lista de tokens.
@@ -91,6 +93,17 @@ fn main() {
                 // falta recorrer el árbol para verificar declaraciones.
                 println!();
                 semantico.tabla().print_structure();
+
+                // 4. Transpilación a Java: como no hubo errores, recorremos el
+                // árbol otra vez para emitir el código Java equivalente.
+                println!("\n--- Transpilador a Java ---");
+                let clase = nombre_de_clase(ruta);
+                let java = Transpilador::new(&clase).transpilar(&arbol);
+                let salida = format!("{}.java", clase);
+                match std::fs::write(&salida, java) {
+                    Ok(_) => println!("Código Java generado en '{}'.", salida),
+                    Err(e) => eprintln!("No se pudo escribir '{}': {}", salida, e),
+                }
             } else {
                 println!("\nPrograma inválido por errores semánticos ({}):", errores.len());
                 for entry in &errores {
@@ -106,5 +119,19 @@ fn main() {
                 println!("{}", entry);
             }
         }
+    }
+}
+
+// Deriva el nombre de la clase Java a partir del archivo fuente: en Java la
+// clase pública debe llamarse igual que el archivo (`Programa.java`).
+fn nombre_de_clase(ruta: &str) -> String {
+    let stem = std::path::Path::new(ruta)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("Programa");
+    let mut chars = stem.chars();
+    match chars.next() {
+        Some(c) => c.to_uppercase().collect::<String>() + chars.as_str(),
+        None => "Programa".to_string(),
     }
 }

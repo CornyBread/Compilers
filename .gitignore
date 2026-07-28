@@ -17,6 +17,6 @@ DDS/bin/*.d
 Thumbs.db
 Desktop.ini
 
-# Asistentes de IA (no versionar)
+# Asistentes de IA 
 CLAUDE.md
 .claude/
